@@ -116,6 +116,7 @@ async function openTravelFolder(win) {
 async function openPhoneApp(win, provider) {
   const appPositions = {
     Gojek: { x: 0.29, y: 0.405 },
+    "CDG Zig": { x: 0.5, y: 0.405 },
     TADA: { x: 0.71, y: 0.405 },
     Grab: { x: 0.29, y: 0.515 },
   };
@@ -173,6 +174,10 @@ async function ocrPhone(win, runDir, name) {
   return { imagePath, ocr: await ocrImage(imagePath) };
 }
 
+function destinationText(requestBody) {
+  return String(requestBody.destination ?? "Changi Green").trim() || "Changi Green";
+}
+
 async function prepareGojekDemo(win, runDir) {
   const initial = await ocrPhone(win, runDir, "gojek-pre-route");
   if (/(GoCar|Find driver|S\$)/i.test(initial.ocr)) {
@@ -188,7 +193,7 @@ async function prepareGojekDemo(win, runDir) {
   }
 }
 
-async function prepareTadaDemo(win, runDir) {
+async function prepareTadaDemo(win, runDir, requestBody) {
   const initial = await ocrPhone(win, runDir, "tada-pre-route");
   if (/(AnyTADA|TADA GO|Book|SGD)/i.test(initial.ocr)) {
     return;
@@ -196,7 +201,7 @@ async function prepareTadaDemo(win, runDir) {
 
   await tapRelative(win, 0.32, 0.292);
   await sleep(500);
-  await pasteText("Changi Green");
+  await pasteText(destinationText(requestBody));
   await sleep(1000);
   await tapRelative(win, 0.35, 0.665);
   await sleep(1800);
@@ -207,7 +212,7 @@ async function prepareTadaDemo(win, runDir) {
   }
 }
 
-async function prepareGrabDemo(win, runDir) {
+async function prepareGrabDemo(win, runDir, requestBody) {
   const initial = await ocrPhone(win, runDir, "grab-pre-route");
   if (/(JustGrab|GrabCar|Book|Choose this ride|S\$)/i.test(initial.ocr)) {
     return;
@@ -215,10 +220,21 @@ async function prepareGrabDemo(win, runDir) {
 
   await tapRelative(win, 0.34, 0.295);
   await sleep(500);
-  await pasteText("Changi Green");
+  await pasteText(destinationText(requestBody));
   await sleep(1200);
   await tapRelative(win, 0.36, 0.42);
   await sleep(2200);
+}
+
+async function prepareCdgDemo(win, runDir) {
+  const initial = await ocrPhone(win, runDir, "cdg-pre-route");
+  if (/Done|Singapore Government Agency|Campaigns&Events|Change for Charity/i.test(initial.ocr)) {
+    await tapRelative(win, 0.09, 0.15);
+    await sleep(700);
+    await openTravelFolder(win);
+    await tapRelative(win, 0.5, 0.405);
+    await sleep(1500);
+  }
 }
 
 function extractPrice(ocrText) {
@@ -237,10 +253,10 @@ function extractPrice(ocrText) {
 
 async function liveQuotes(requestBody, onResult = () => {}) {
   const providers = [
-    { id: "gojek", name: "Gojek", searchName: "Gojek", waitMs: 1400 },
-    { id: "grab", name: "Grab", searchName: "Grab", waitMs: 1300 },
-    { id: "cdg", name: "CDG Zig", searchName: "CDG Zig", waitMs: 1500 },
-    { id: "tada", name: "TADA", searchName: "TADA", waitMs: 1400 },
+    { id: "gojek", name: "Gojek", searchName: "Gojek", waitMs: 1300, prepare: prepareGojekDemo },
+    { id: "grab", name: "Grab", searchName: "Grab", waitMs: 1400, prepare: prepareGrabDemo },
+    { id: "tada", name: "TADA", searchName: "TADA", waitMs: 1200, prepare: prepareTadaDemo },
+    { id: "cdg", name: "CDG Zig", searchName: "CDG Zig", waitMs: 1500, prepare: prepareCdgDemo },
   ];
   const runDir = await mkdtemp(join(tmpdir(), "ride-router-live-"));
   const scans = [];
@@ -248,7 +264,8 @@ async function liveQuotes(requestBody, onResult = () => {}) {
 
   for (const provider of providers) {
     try {
-      await openPhoneApp(win, provider, requestBody.destination);
+      await openPhoneApp(win, provider);
+      await provider.prepare?.(win, runDir, requestBody);
       const imagePath = await capturePhoneImage(win, runDir, provider.id);
       scans.push(
         ocrImage(imagePath)
