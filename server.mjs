@@ -78,10 +78,6 @@ async function clickPoint(x, y) {
   await osascript(["-l", "JavaScript", "-e", script]);
 }
 
-async function keystroke(text) {
-  await osascript(["-e", `tell application "System Events" to keystroke ${JSON.stringify(text)}`]);
-}
-
 async function keyCode(code, modifiers = "") {
   const suffix = modifiers ? ` using ${modifiers}` : "";
   await osascript(["-e", `tell application "System Events" to key code ${code}${suffix}`]);
@@ -90,40 +86,34 @@ async function keyCode(code, modifiers = "") {
 async function goHome() {
   await activatePhone();
   await keyCode(53).catch(() => {});
-  await sleep(150);
+  await sleep(100);
   await keyCode(18, "command down");
-  await sleep(900);
+  await sleep(500);
 }
 
-async function openPhoneApp(searchName) {
+async function openTravelFolder() {
+  const win = await phoneWindow();
+  await clickPoint(win.x + win.width * 0.64, win.y + win.height * 0.38);
+  await sleep(350);
+}
+
+async function openPhoneApp(provider) {
   const appPositions = {
     Gojek: { x: 0.27, y: 0.41 },
     "CDG Zig": { x: 0.5, y: 0.41 },
     TADA: { x: 0.72, y: 0.41 },
     Grab: { x: 0.27, y: 0.54 },
   };
-  const position = appPositions[searchName];
+  const position = appPositions[provider.searchName];
   if (!position) {
-    throw new Error(`Unknown phone app position: ${searchName}`);
+    throw new Error(`Unknown phone app position: ${provider.searchName}`);
   }
 
   await goHome();
-  await ensureTravelFolder();
+  await openTravelFolder();
   const win = await phoneWindow();
   await clickPoint(win.x + win.width * position.x, win.y + win.height * position.y);
-  await sleep(5000);
-}
-
-async function ensureTravelFolder() {
-  const win = await phoneWindow();
-  const runDir = await mkdtemp(join(tmpdir(), "ride-router-folder-"));
-  const imagePath = await capturePhoneImage(runDir, "folder-check");
-  const text = await ocrImage(imagePath);
-  if (/Travel|Gojek|CDG|TADA|Grab/i.test(text)) {
-    return;
-  }
-  await clickPoint(win.x + win.width * 0.64, win.y + win.height * 0.38);
-  await sleep(800);
+  await sleep(provider.waitMs);
 }
 
 async function capturePhoneImage(runDir, providerId) {
@@ -181,38 +171,53 @@ function extractPrice(ocrText) {
 
 async function liveQuotes(requestBody) {
   const providers = [
-    { id: "grab", name: "Grab", searchName: "Grab" },
-    { id: "gojek", name: "Gojek", searchName: "Gojek" },
-    { id: "cdg", name: "CDG Zig", searchName: "CDG Zig" },
-    { id: "tada", name: "TADA", searchName: "TADA" },
+    { id: "gojek", name: "Gojek", searchName: "Gojek", waitMs: 2200 },
+    { id: "grab", name: "Grab", searchName: "Grab", waitMs: 2200 },
+    { id: "cdg", name: "CDG Zig", searchName: "CDG Zig", waitMs: 2400 },
+    { id: "tada", name: "TADA", searchName: "TADA", waitMs: 2200 },
   ];
   const runDir = await mkdtemp(join(tmpdir(), "ride-router-live-"));
-  const results = [];
+  const scans = [];
 
   for (const provider of providers) {
     try {
-      await openPhoneApp(provider.searchName);
+      await openPhoneApp(provider);
       const imagePath = await capturePhoneImage(runDir, provider.id);
-      const ocr = await ocrImage(imagePath);
-      const price = extractPrice(ocr);
-      results.push({
-        id: provider.id,
-        name: provider.name,
-        price,
-        status: price == null ? "opened-no-fare-detected" : "fare-detected",
-        screenshot: imagePath,
-        ocr: ocr.split("\n").slice(0, 80),
-      });
+      scans.push(
+        ocrImage(imagePath)
+          .then((ocr) => {
+            const price = extractPrice(ocr);
+            return {
+              id: provider.id,
+              name: provider.name,
+              price,
+              status: price == null ? "opened-no-fare-detected" : "fare-detected",
+              screenshot: imagePath,
+              ocr: ocr.split("\n").slice(0, 80),
+            };
+          })
+          .catch((error) => ({
+            id: provider.id,
+            name: provider.name,
+            price: null,
+            status: "ocr-failed",
+            screenshot: imagePath,
+            error: error instanceof Error ? error.message : String(error),
+          })),
+      );
     } catch (error) {
-      results.push({
-        id: provider.id,
-        name: provider.name,
-        price: null,
-        status: "failed",
-        error: error instanceof Error ? error.message : String(error),
-      });
+      scans.push(
+        Promise.resolve({
+          id: provider.id,
+          name: provider.name,
+          price: null,
+          status: "failed",
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
     }
   }
+  const results = await Promise.all(scans);
 
   return {
     destination: requestBody.destination ?? "",
