@@ -131,6 +131,7 @@ const els = {
   bookButton: document.querySelector("#bookButton"),
   copyButton: document.querySelector("#copyButton"),
   shareButton: document.querySelector("#shareButton"),
+  liveScanButton: document.querySelector("#liveScanButton"),
   installButton: document.querySelector("#installButton"),
 };
 
@@ -574,6 +575,54 @@ async function shareTrip() {
   setStatus("Trip summary copied.");
 }
 
+async function runLivePhoneScan() {
+  const destination = els.destinationInput.value.trim();
+  if (!destination) {
+    setStatus("Add a destination before the live phone scan.", "error");
+    els.destinationInput.focus();
+    return;
+  }
+
+  els.liveScanButton.disabled = true;
+  els.liveScanButton.textContent = "Scanning...";
+  setStatus("Driving iPhone Mirroring now. Keep the phone window visible.");
+
+  try {
+    const response = await fetch("/api/live-quotes", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        destination,
+        pickup: els.pickupInput.value.trim(),
+      }),
+    });
+    if (!response.ok) {
+      throw new Error("Live phone scan failed.");
+    }
+    const payload = await response.json();
+    let detected = 0;
+    for (const result of payload.results ?? []) {
+      if (Number.isFinite(result.price)) {
+        state.quotes.set(result.id, result.price);
+        detected += 1;
+      }
+    }
+    recomputeSelection(false);
+    renderProviders();
+    setStatus(
+      detected > 0
+        ? `Live scan found ${detected} real fare ${detected === 1 ? "price" : "prices"}.`
+        : "Apps opened, but no fare prices were visible for OCR yet.",
+      detected > 0 ? "muted" : "error",
+    );
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : "Live phone scan failed.", "error");
+  } finally {
+    els.liveScanButton.disabled = false;
+    els.liveScanButton.textContent = "Live phone scan";
+  }
+}
+
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
   state.deferredInstallPrompt = event;
@@ -595,6 +644,7 @@ els.routeButton.addEventListener("click", compareTrip);
 els.bookButton.addEventListener("click", bookSelected);
 els.copyButton.addEventListener("click", copyDestination);
 els.shareButton.addEventListener("click", shareTrip);
+els.liveScanButton.addEventListener("click", runLivePhoneScan);
 els.destinationInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     if (state.suggestions[0]) {

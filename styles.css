@@ -234,12 +234,14 @@ h1 {
 }
 
 .actions {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1fr;
   gap: 10px;
   margin-bottom: 14px;
 }
 
 .actions button {
-  flex: 1;
+  min-width: 0;
 }
 
 .provider-list {
@@ -369,6 +371,10 @@ h1 {
 
   .provider-price {
     text-align: left;
+  }
+
+  .actions {
+    grid-template-columns: 1fr;
   }
 
   .booking-bar {
