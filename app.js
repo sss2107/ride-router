@@ -41,18 +41,84 @@ const providers = [
   },
 ];
 
+const savedPlaces = [
+  {
+    id: "home",
+    title: "Home",
+    subtitle: "Blk 716, Changi Green",
+    query: "Blk 716 Changi Green",
+    aliases: ["home", "house", "blk 716", "716", "changi green"],
+    icon: "H",
+    lat: 1.3469,
+    lon: 103.9642,
+  },
+  {
+    id: "changi-airport-t3",
+    title: "Changi Airport Terminal 3",
+    subtitle: "Airport",
+    query: "Changi Airport Terminal 3",
+    aliases: ["changi", "airport", "terminal 3", "t3"],
+    icon: "A",
+    lat: 1.3576,
+    lon: 103.9877,
+  },
+  {
+    id: "marina-bay-sands",
+    title: "Marina Bay Sands",
+    subtitle: "Bayfront",
+    query: "Marina Bay Sands",
+    aliases: ["mbs", "bayfront"],
+    icon: "M",
+    lat: 1.2838,
+    lon: 103.8591,
+  },
+  {
+    id: "orchard-road",
+    title: "Orchard Road",
+    subtitle: "Shopping belt",
+    query: "Orchard Road",
+    aliases: ["orchard"],
+    icon: "O",
+    lat: 1.3048,
+    lon: 103.8318,
+  },
+  {
+    id: "raffles-place",
+    title: "Raffles Place",
+    subtitle: "CBD",
+    query: "Raffles Place",
+    aliases: ["raffles", "cbd"],
+    icon: "R",
+    lat: 1.284,
+    lon: 103.8513,
+  },
+  {
+    id: "tanjong-pagar",
+    title: "Tanjong Pagar Centre",
+    subtitle: "Guoco Tower",
+    query: "Tanjong Pagar Centre",
+    aliases: ["tanjong pagar", "guoco"],
+    icon: "T",
+    lat: 1.2764,
+    lon: 103.8459,
+  },
+];
+
 const state = {
-  pickup: null,
+  pickup: savedPlaces[0],
   destination: null,
   distanceKm: null,
   quotes: new Map(),
   selectedId: null,
   deferredInstallPrompt: null,
+  suggestionAbort: null,
+  suggestions: [],
 };
 
 const els = {
   pickupInput: document.querySelector("#pickupInput"),
   destinationInput: document.querySelector("#destinationInput"),
+  suggestionList: document.querySelector("#suggestionList"),
   locateButton: document.querySelector("#locateButton"),
   routeButton: document.querySelector("#routeButton"),
   statusLine: document.querySelector("#statusLine"),
@@ -67,6 +133,8 @@ const els = {
   shareButton: document.querySelector("#shareButton"),
   installButton: document.querySelector("#installButton"),
 };
+
+els.pickupInput.value = `${savedPlaces[0].title} · ${savedPlaces[0].subtitle}`;
 
 function setStatus(message, tone = "muted") {
   els.statusLine.textContent = message;
@@ -101,6 +169,17 @@ function estimateFare(provider) {
   const airportLift = /airport|changi|jewel/i.test(els.destinationInput.value) ? 6 : 0;
   const fare = (provider.fare.base + km * provider.fare.perKm + airportLift) * provider.fare.surge;
   return Math.max(5, fare);
+}
+
+function normalizePlace(place) {
+  return {
+    label: place.title ?? place.label ?? place.query,
+    title: place.title ?? place.label ?? place.query,
+    subtitle: place.subtitle ?? "",
+    query: place.query ?? place.title ?? place.label,
+    lat: place.lat,
+    lon: place.lon,
+  };
 }
 
 function providerRows() {
@@ -184,7 +263,163 @@ function renderProviders() {
   }
 }
 
+function placeMatches(place, query) {
+  return suggestionScore(place, query) < Number.POSITIVE_INFINITY;
+}
+
+function suggestionScore(place, query) {
+  const needle = query.trim().toLowerCase();
+  if (!needle) {
+    return 0;
+  }
+  const title = place.title.toLowerCase();
+  const queryText = place.query.toLowerCase();
+  const subtitle = place.subtitle.toLowerCase();
+  const aliases = place.aliases ?? [];
+  if (title === needle || queryText === needle || aliases.some((alias) => alias === needle)) {
+    return 0;
+  }
+  if (title.startsWith(needle)) {
+    return 1;
+  }
+  if (queryText.startsWith(needle)) {
+    return 2;
+  }
+  if (aliases.some((alias) => alias.startsWith(needle))) {
+    return 3;
+  }
+  if (title.includes(needle) || queryText.includes(needle)) {
+    return 4;
+  }
+  if (subtitle.includes(needle)) {
+    return 5;
+  }
+  return Number.POSITIVE_INFINITY;
+}
+
+function renderSuggestions(items) {
+  state.suggestions = items;
+  els.suggestionList.textContent = "";
+  els.destinationInput.setAttribute("aria-expanded", items.length > 0 ? "true" : "false");
+  els.suggestionList.classList.toggle("visible", items.length > 0);
+
+  for (const item of items) {
+    const button = document.createElement("button");
+    button.className = "suggestion-option";
+    button.type = "button";
+    button.role = "option";
+    button.innerHTML = `
+      <span class="suggestion-icon" aria-hidden="true">${item.icon ?? "P"}</span>
+      <span>
+        <span class="suggestion-title"></span>
+        <span class="suggestion-subtitle"></span>
+      </span>
+    `;
+    button.querySelector(".suggestion-title").textContent = item.title;
+    button.querySelector(".suggestion-subtitle").textContent = item.subtitle;
+    button.addEventListener("click", () => selectSuggestion(item));
+    els.suggestionList.append(button);
+  }
+}
+
+function selectSuggestion(place) {
+  const normalized = normalizePlace(place);
+  state.destination = normalized;
+  els.destinationInput.value = normalized.query;
+  renderSuggestions([]);
+  setStatus(`${normalized.title} selected. Compare when ready.`);
+}
+
+function localSuggestions(query) {
+  return savedPlaces
+    .filter((place) => placeMatches(place, query))
+    .sort((a, b) => suggestionScore(a, query) - suggestionScore(b, query) || a.title.localeCompare(b.title))
+    .slice(0, 4)
+    .map((place) => ({ ...place, source: "saved" }));
+}
+
+async function remoteSuggestions(query, signal) {
+  if (query.trim().length < 3) {
+    return [];
+  }
+
+  const params = new URLSearchParams({
+    q: `${query}, Singapore`,
+    format: "jsonv2",
+    addressdetails: "1",
+    countrycodes: "sg",
+    limit: "5",
+  });
+  const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+    headers: { Accept: "application/json" },
+    signal,
+  });
+  if (!response.ok) {
+    return [];
+  }
+  const results = await response.json();
+  return results.map((result) => {
+    const title = result.name || result.display_name.split(",")[0];
+    const subtitle = result.display_name
+      .split(",")
+      .slice(1, 4)
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join(", ");
+    return {
+      id: `osm-${result.osm_type}-${result.osm_id}`,
+      title,
+      subtitle,
+      query: title,
+      icon: "P",
+      lat: Number.parseFloat(result.lat),
+      lon: Number.parseFloat(result.lon),
+      source: "search",
+    };
+  });
+}
+
+function dedupeSuggestions(items) {
+  const seen = new Set();
+  const unique = [];
+  for (const item of items) {
+    const key = item.title.trim().toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    unique.push(item);
+  }
+  return unique.slice(0, 6);
+}
+
+async function updateSuggestions() {
+  const query = els.destinationInput.value.trim();
+  const local = localSuggestions(query);
+  renderSuggestions(local);
+
+  if (state.suggestionAbort) {
+    state.suggestionAbort.abort();
+  }
+  state.suggestionAbort = new AbortController();
+
+  try {
+    const remote = await remoteSuggestions(query, state.suggestionAbort.signal);
+    renderSuggestions(dedupeSuggestions([...local, ...remote]));
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return;
+    }
+    renderSuggestions(local);
+  }
+}
+
 async function geocode(query) {
+  const saved = savedPlaces.find((place) => placeMatches(place, query) && query.trim().length >= 3);
+  if (saved && saved.title.toLowerCase() === query.trim().toLowerCase()) {
+    return normalizePlace(saved);
+  }
+
   const params = new URLSearchParams({
     q: `${query}, Singapore`,
     format: "jsonv2",
@@ -202,6 +437,9 @@ async function geocode(query) {
   }
   return {
     label: result.display_name,
+    title: result.display_name.split(",")[0],
+    subtitle: result.display_name,
+    query,
     lat: Number.parseFloat(result.lat),
     lon: Number.parseFloat(result.lon),
   };
@@ -225,7 +463,9 @@ function locate() {
       setStatus("Pickup locked from phone GPS.");
     },
     () => {
-      setStatus("GPS is blocked here. Use manual pickup or an HTTPS tunnel.", "error");
+      state.pickup = normalizePlace(savedPlaces[0]);
+      els.pickupInput.value = `${savedPlaces[0].title} · ${savedPlaces[0].subtitle}`;
+      setStatus("Location blocked, so I am using Home as pickup.");
     },
     { enableHighAccuracy: true, maximumAge: 45_000, timeout: 12_000 },
   );
@@ -241,10 +481,10 @@ async function compareTrip() {
 
   setStatus("Resolving destination and estimating fares...");
   try {
-    state.destination = await geocode(destination);
+    state.destination = state.destination?.query === destination ? state.destination : await geocode(destination);
     if (!state.pickup) {
       const pickupText = els.pickupInput.value.trim();
-      state.pickup = pickupText ? await geocode(pickupText) : { label: "Manual pickup", lat: 1.3521, lon: 103.8198 };
+      state.pickup = pickupText ? await geocode(pickupText) : normalizePlace(savedPlaces[0]);
     }
     state.distanceKm = distanceKm(state.pickup, state.destination);
     state.quotes.clear();
@@ -322,7 +562,21 @@ els.copyButton.addEventListener("click", copyDestination);
 els.shareButton.addEventListener("click", shareTrip);
 els.destinationInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
+    if (state.suggestions[0]) {
+      selectSuggestion(state.suggestions[0]);
+    }
     compareTrip();
+  }
+});
+els.destinationInput.addEventListener("input", () => {
+  state.destination = null;
+  window.clearTimeout(els.destinationInput.suggestionTimer);
+  els.destinationInput.suggestionTimer = window.setTimeout(updateSuggestions, 180);
+});
+els.destinationInput.addEventListener("focus", updateSuggestions);
+document.addEventListener("click", (event) => {
+  if (!els.suggestionList.contains(event.target) && event.target !== els.destinationInput) {
+    renderSuggestions([]);
   }
 });
 

@@ -31,20 +31,19 @@
 
         <label>
           <span>Destination</span>
-          <div class="input-row">
-            <input id="destinationInput" list="destinations" autocomplete="off" placeholder="Where are you going?" />
+          <div class="input-row destination-row">
+            <input
+              id="destinationInput"
+              autocomplete="off"
+              aria-autocomplete="list"
+              aria-expanded="false"
+              aria-controls="suggestionList"
+              placeholder="Where are you going?"
+            />
             <button id="routeButton" type="button">Compare</button>
           </div>
+          <div class="suggestion-list" id="suggestionList" role="listbox" aria-label="Destination suggestions"></div>
         </label>
-
-        <datalist id="destinations">
-          <option value="Changi Airport Terminal 3" />
-          <option value="Marina Bay Sands" />
-          <option value="Orchard Road" />
-          <option value="Raffles Place" />
-          <option value="Tanjong Pagar Centre" />
-          <option value="Jewel Changi Airport" />
-        </datalist>
 
         <div class="status-line" id="statusLine">Ready when you are.</div>
       </section>
