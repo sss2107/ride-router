@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ride Router PPT Points</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0c1014;
+        --panel: #151b20;
+        --text: #f5f7f5;
+        --muted: #9aa6a0;
+        --accent: #31d18d;
+        --line: #273139;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      main {
+        display: grid;
+        gap: 18px;
+        width: min(1040px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 40px 0;
+      }
+
+      section {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 28px;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--accent);
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 760px;
+        font-size: clamp(2.2rem, 6vw, 4.4rem);
+        line-height: 0.98;
+      }
+
+      h2 {
+        font-size: 1.45rem;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+        font-size: 1.04rem;
+        line-height: 1.55;
+      }
+
+      ul {
+        display: grid;
+        gap: 10px;
+        margin: 18px 0 0;
+        padding-left: 1.2rem;
+      }
+
+      strong {
+        color: var(--text);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <p class="eyebrow">Slide copy</p>
+        <h1>Fastest realistic cab comparison on one iPhone</h1>
+      </section>
+
+      <section>
+        <h2>What can actually be parallelized</h2>
+        <ul>
+          <li>
+            <strong>Not truly parallel app checks:</strong> iOS only lets one ride app be foregrounded at a time,
+            so Grab, Gojek, CDG Zig, and TADA still have to be opened sequentially.
+          </li>
+          <li>
+            <strong>Parallel backend work:</strong> while iPhone Mirroring moves to the next app, the Mac OCRs
+            already-captured screenshots in parallel and updates the cheapest fare as results come in.
+          </li>
+          <li>
+            <strong>Fixed Travel folder layout:</strong> the scanner skips slow OCR-based folder discovery and taps
+            the known Travel-folder positions directly.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Why ads make OCR hard</h2>
+        <ul>
+          <li>CDG Zig and TADA can show promotional popups before the booking surface, hiding fare text entirely.</li>
+          <li>Ad copy often contains dollar amounts, promo percentages, vouchers, and reward text that look like fares.</li>
+          <li>The app now taps the known close area first, then filters obvious promo lines before picking the lowest fare-like price.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Speed direction</h2>
+        <ul>
+          <li>Launch apps from the fixed Travel folder coordinates.</li>
+          <li>Dismiss known ad surfaces immediately for CDG Zig and TADA.</li>
+          <li>Capture each screen quickly, then OCR in the background while the phone keeps moving.</li>
+          <li>Return partial results to the web app, so the cheapest option appears as soon as OCR finds it.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

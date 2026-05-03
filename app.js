@@ -113,6 +113,7 @@ const state = {
   deferredInstallPrompt: null,
   suggestionAbort: null,
   suggestions: [],
+  liveScanPollTimer: null,
 };
 
 const els = {
@@ -575,6 +576,57 @@ async function shareTrip() {
   setStatus("Trip summary copied.");
 }
 
+function applyLiveScanResults(results) {
+  let detected = 0;
+  for (const result of results ?? []) {
+    if (Number.isFinite(result.price)) {
+      state.quotes.set(result.id, result.price);
+      detected += 1;
+    }
+  }
+  recomputeSelection(false);
+  renderProviders();
+  return detected;
+}
+
+async function pollLivePhoneScan(jobId) {
+  const response = await fetch(`/api/live-quotes/${encodeURIComponent(jobId)}`);
+  if (!response.ok) {
+    throw new Error("Could not read the background scan.");
+  }
+
+  const job = await response.json();
+  const detected = applyLiveScanResults(job.results);
+  if (job.status === "running") {
+    setStatus(
+      job.results.length > 0
+        ? `Background scan running. ${job.results.length}/4 apps captured, ${detected} fares detected.`
+        : "Background scan running. iPhone Mirroring is moving through the apps.",
+    );
+    state.liveScanPollTimer = window.setTimeout(() => {
+      pollLivePhoneScan(jobId).catch((error) => {
+        setStatus(error instanceof Error ? error.message : "Background scan polling failed.", "error");
+        els.liveScanButton.disabled = false;
+        els.liveScanButton.textContent = "Live phone scan";
+      });
+    }, 900);
+    return;
+  }
+
+  if (job.status === "failed") {
+    throw new Error(job.error ?? "Background live phone scan failed.");
+  }
+
+  setStatus(
+    detected > 0
+      ? `Live scan found ${detected} real fare ${detected === 1 ? "price" : "prices"}.`
+      : "Apps opened, but no fare prices were visible for OCR yet.",
+    detected > 0 ? "muted" : "error",
+  );
+  els.liveScanButton.disabled = false;
+  els.liveScanButton.textContent = "Live phone scan";
+}
+
 async function runLivePhoneScan() {
   const destination = els.destinationInput.value.trim();
   if (!destination) {
@@ -584,8 +636,9 @@ async function runLivePhoneScan() {
   }
 
   els.liveScanButton.disabled = true;
-  els.liveScanButton.textContent = "Scanning...";
-  setStatus("Driving iPhone Mirroring now. Keep the phone window visible.");
+  els.liveScanButton.textContent = "Started";
+  window.clearTimeout(state.liveScanPollTimer);
+  setStatus("Starting background phone scan. Keep iPhone Mirroring visible.");
 
   try {
     const response = await fetch("/api/live-quotes", {
@@ -596,28 +649,14 @@ async function runLivePhoneScan() {
         pickup: els.pickupInput.value.trim(),
       }),
     });
-    if (!response.ok) {
-      throw new Error("Live phone scan failed.");
+    if (response.status !== 202 && !response.ok) {
+      throw new Error("Live phone scan failed to start.");
     }
-    const payload = await response.json();
-    let detected = 0;
-    for (const result of payload.results ?? []) {
-      if (Number.isFinite(result.price)) {
-        state.quotes.set(result.id, result.price);
-        detected += 1;
-      }
-    }
-    recomputeSelection(false);
-    renderProviders();
-    setStatus(
-      detected > 0
-        ? `Live scan found ${detected} real fare ${detected === 1 ? "price" : "prices"}.`
-        : "Apps opened, but no fare prices were visible for OCR yet.",
-      detected > 0 ? "muted" : "error",
-    );
+    const job = await response.json();
+    setStatus("Background scan started. You can leave this page open while the Mac checks apps.");
+    await pollLivePhoneScan(job.id);
   } catch (error) {
     setStatus(error instanceof Error ? error.message : "Live phone scan failed.", "error");
-  } finally {
     els.liveScanButton.disabled = false;
     els.liveScanButton.textContent = "Live phone scan";
   }

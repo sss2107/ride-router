@@ -20,6 +20,12 @@ Location access on iPhone Safari requires a secure origin. If the phone blocks G
 - Lets you confirm real observed fares after opening each app.
 - Picks the cheapest confirmed fare, or the cheapest estimate if none are confirmed.
 - Copies the destination before opening a ride app so booking is faster.
+- Starts iPhone Mirroring fare checks as a background job, then polls partial OCR results while the Mac keeps moving through apps.
+- Uses the fixed Travel folder layout directly and taps known Grab/CDG/TADA prep points to avoid slow folder OCR and common ad blockers.
+
+## Pitch Notes
+
+Open `ppt-points.html` for slide-ready copy on the speed strategy, iOS foregrounding limits, and OCR challenges from app ads.
 
 ## Limit
 
