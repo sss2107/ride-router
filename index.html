@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#101418" />
+    <title>Ride Router</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar" aria-label="Ride search">
+        <div>
+          <p class="eyebrow">Singapore ride scout</p>
+          <h1>Ride Router</h1>
+        </div>
+        <button id="installButton" class="icon-button hidden" type="button" title="Install app" aria-label="Install app">
+          <span aria-hidden="true">+</span>
+        </button>
+      </section>
+
+      <section class="search-panel" aria-label="Trip inputs">
+        <label>
+          <span>Pickup</span>
+          <div class="input-row">
+            <input id="pickupInput" autocomplete="street-address" placeholder="Use current location or enter pickup" />
+            <button id="locateButton" type="button">Locate</button>
+          </div>
+        </label>
+
+        <label>
+          <span>Destination</span>
+          <div class="input-row">
+            <input id="destinationInput" list="destinations" autocomplete="off" placeholder="Where are you going?" />
+            <button id="routeButton" type="button">Compare</button>
+          </div>
+        </label>
+
+        <datalist id="destinations">
+          <option value="Changi Airport Terminal 3" />
+          <option value="Marina Bay Sands" />
+          <option value="Orchard Road" />
+          <option value="Raffles Place" />
+          <option value="Tanjong Pagar Centre" />
+          <option value="Jewel Changi Airport" />
+        </datalist>
+
+        <div class="status-line" id="statusLine">Ready when you are.</div>
+      </section>
+
+      <section class="trip-card" aria-label="Trip summary">
+        <div>
+          <span class="metric-label">Distance</span>
+          <strong id="distanceMetric">--</strong>
+        </div>
+        <div>
+          <span class="metric-label">Best choice</span>
+          <strong id="bestMetric">--</strong>
+        </div>
+        <div>
+          <span class="metric-label">Saved vs high</span>
+          <strong id="savingMetric">--</strong>
+        </div>
+      </section>
+
+      <section class="actions" aria-label="Fast actions">
+        <button id="copyButton" type="button">Copy destination</button>
+        <button id="shareButton" type="button">Share trip</button>
+      </section>
+
+      <section class="provider-list" id="providerList" aria-label="Ride app quotes"></section>
+
+      <section class="booking-bar" aria-label="Booking decision">
+        <div>
+          <span>Selected</span>
+          <strong id="selectedProvider">None yet</strong>
+        </div>
+        <button id="bookButton" type="button" disabled>Book cheapest</button>
+      </section>
+    </main>
+
+    <template id="providerTemplate">
+      <article class="provider-card">
+        <div class="provider-main">
+          <div class="provider-logo"></div>
+          <div>
+            <h2></h2>
+            <p></p>
+          </div>
+        </div>
+        <div class="provider-price">
+          <span>Estimate</span>
+          <strong></strong>
+        </div>
+        <label class="quote-input">
+          <span>Actual fare</span>
+          <input inputmode="decimal" pattern="[0-9.]*" placeholder="$" />
+        </label>
+        <div class="provider-actions">
+          <button class="open-app" type="button">Open app</button>
+          <button class="select-app" type="button">Select</button>
+        </div>
+      </article>
+    </template>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
