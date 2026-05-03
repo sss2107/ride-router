@@ -105,7 +105,7 @@ const savedPlaces = [
 ];
 
 const state = {
-  pickup: savedPlaces[0],
+  pickup: null,
   destination: null,
   distanceKm: null,
   quotes: new Map(),
@@ -133,8 +133,6 @@ const els = {
   shareButton: document.querySelector("#shareButton"),
   installButton: document.querySelector("#installButton"),
 };
-
-els.pickupInput.value = `${savedPlaces[0].title} · ${savedPlaces[0].subtitle}`;
 
 function setStatus(message, tone = "muted") {
   els.statusLine.textContent = message;
@@ -415,8 +413,14 @@ async function updateSuggestions() {
 }
 
 async function geocode(query) {
-  const saved = savedPlaces.find((place) => placeMatches(place, query) && query.trim().length >= 3);
-  if (saved && saved.title.toLowerCase() === query.trim().toLowerCase()) {
+  const normalizedQuery = query.trim().toLowerCase();
+  const saved = savedPlaces.find((place) => {
+    const aliases = place.aliases ?? [];
+    return [place.title, place.subtitle, place.query, ...aliases]
+      .filter(Boolean)
+      .some((value) => value.toLowerCase() === normalizedQuery);
+  });
+  if (saved) {
     return normalizePlace(saved);
   }
 
@@ -446,29 +450,52 @@ async function geocode(query) {
 }
 
 function locate() {
+  return locateCurrentPosition({ userInitiated: true });
+}
+
+function locateCurrentPosition({ userInitiated = false } = {}) {
   if (!navigator.geolocation) {
     setStatus("This browser does not expose GPS. Enter pickup manually.", "error");
-    return;
+    return Promise.reject(new Error("Geolocation unavailable."));
   }
 
   setStatus("Finding your current location...");
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      state.pickup = {
-        label: "Current location",
-        lat: position.coords.latitude,
-        lon: position.coords.longitude,
-      };
-      els.pickupInput.value = "Current location";
-      setStatus("Pickup locked from phone GPS.");
-    },
-    () => {
-      state.pickup = normalizePlace(savedPlaces[0]);
-      els.pickupInput.value = `${savedPlaces[0].title} · ${savedPlaces[0].subtitle}`;
-      setStatus("Location blocked, so I am using Home as pickup.");
-    },
-    { enableHighAccuracy: true, maximumAge: 45_000, timeout: 12_000 },
-  );
+  els.locateButton.disabled = true;
+  els.locateButton.textContent = "GPS...";
+
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        state.pickup = {
+          label: "Current location",
+          title: "Current location",
+          subtitle: "Phone GPS",
+          query: "Current location",
+          lat: position.coords.latitude,
+          lon: position.coords.longitude,
+        };
+        els.pickupInput.value = "Current location";
+        setStatus("Pickup locked from phone GPS.");
+        els.locateButton.disabled = false;
+        els.locateButton.textContent = "Locate";
+        resolve(state.pickup);
+      },
+      (error) => {
+        state.pickup = null;
+        if (els.pickupInput.value === "Current location") {
+          els.pickupInput.value = "";
+        }
+        const message = userInitiated
+          ? "GPS is blocked. Allow location for this page, or enter pickup manually."
+          : "GPS needs permission. Tap Locate, or enter pickup manually.";
+        setStatus(message, userInitiated ? "error" : "muted");
+        els.locateButton.disabled = false;
+        els.locateButton.textContent = "Locate";
+        reject(error);
+      },
+      { enableHighAccuracy: true, maximumAge: 20_000, timeout: 12_000 },
+    );
+  });
 }
 
 async function compareTrip() {
@@ -484,7 +511,15 @@ async function compareTrip() {
     state.destination = state.destination?.query === destination ? state.destination : await geocode(destination);
     if (!state.pickup) {
       const pickupText = els.pickupInput.value.trim();
-      state.pickup = pickupText ? await geocode(pickupText) : normalizePlace(savedPlaces[0]);
+      if (pickupText && pickupText !== "Current location") {
+        state.pickup = await geocode(pickupText);
+      } else {
+        try {
+          await locateCurrentPosition();
+        } catch {
+          throw new Error("Pickup is missing. Allow GPS or enter pickup manually.");
+        }
+      }
     }
     state.distanceKm = distanceKm(state.pickup, state.destination);
     state.quotes.clear();
@@ -582,3 +617,4 @@ document.addEventListener("click", (event) => {
 
 recomputeSelection(false);
 renderProviders();
+locateCurrentPosition().catch(() => {});
