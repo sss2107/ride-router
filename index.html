@@ -3,106 +3,35 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#101418" />
+    <meta name="theme-color" content="#f8fff8" />
     <title>Ride Router</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="shell">
-      <section class="topbar" aria-label="Ride search">
-        <div>
-          <p class="eyebrow">Singapore ride scout</p>
-          <h1>Ride Router</h1>
+      <header class="masthead">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <h1>Ride Router</h1>
+      </header>
+
+      <form class="prompt-form" id="commandForm">
+        <label class="sr-only" for="commandInput">Ride request</label>
+        <textarea
+          id="commandInput"
+          autocomplete="off"
+          rows="4"
+          placeholder="find the cheapest app from xx to yy"
+        ></textarea>
+        <div class="form-actions">
+          <button id="sendCommandButton" type="submit">Send</button>
+          <button id="demoCommandButton" class="secondary-button" type="button">Demo run</button>
         </div>
-        <button id="installButton" class="icon-button hidden" type="button" title="Install app" aria-label="Install app">
-          <span aria-hidden="true">+</span>
-        </button>
-      </section>
+      </form>
 
-      <section class="search-panel" aria-label="Trip inputs">
-        <label>
-          <span>Pickup</span>
-          <div class="input-row">
-            <input id="pickupInput" autocomplete="street-address" placeholder="Use current location or enter pickup" />
-            <button id="locateButton" type="button">Locate</button>
-          </div>
-        </label>
-
-        <label>
-          <span>Destination</span>
-          <div class="input-row destination-row">
-            <input
-              id="destinationInput"
-              autocomplete="off"
-              aria-autocomplete="list"
-              aria-expanded="false"
-              aria-controls="suggestionList"
-              placeholder="Where are you going?"
-            />
-            <button id="routeButton" type="button">Compare</button>
-          </div>
-          <div class="suggestion-list" id="suggestionList" role="listbox" aria-label="Destination suggestions"></div>
-        </label>
-
-        <div class="status-line" id="statusLine">Ready when you are.</div>
-      </section>
-
-      <section class="trip-card" aria-label="Trip summary">
-        <div>
-          <span class="metric-label">Distance</span>
-          <strong id="distanceMetric">--</strong>
-        </div>
-        <div>
-          <span class="metric-label">Best choice</span>
-          <strong id="bestMetric">--</strong>
-        </div>
-        <div>
-          <span class="metric-label">Saved vs high</span>
-          <strong id="savingMetric">--</strong>
-        </div>
-      </section>
-
-      <section class="actions" aria-label="Fast actions">
-        <button id="liveScanButton" type="button">Live phone scan</button>
-        <button id="copyButton" type="button">Copy destination</button>
-        <button id="shareButton" type="button">Share trip</button>
-      </section>
-
-      <section class="provider-list" id="providerList" aria-label="Ride app quotes"></section>
-
-      <section class="booking-bar" aria-label="Booking decision">
-        <div>
-          <span>Selected</span>
-          <strong id="selectedProvider">None yet</strong>
-        </div>
-        <button id="bookButton" type="button" disabled>Book cheapest</button>
-      </section>
+      <section class="fare-actions hidden" id="commandOutput" aria-live="polite"></section>
+      <p class="status-line" id="statusLine"></p>
     </main>
-
-    <template id="providerTemplate">
-      <article class="provider-card">
-        <div class="provider-main">
-          <div class="provider-logo"></div>
-          <div>
-            <h2></h2>
-            <p></p>
-          </div>
-        </div>
-        <div class="provider-price">
-          <span>Estimate</span>
-          <strong></strong>
-        </div>
-        <label class="quote-input">
-          <span>Actual fare</span>
-          <input inputmode="decimal" pattern="[0-9.]*" placeholder="$" />
-        </label>
-        <div class="provider-actions">
-          <button class="open-app" type="button">Open app</button>
-          <button class="select-app" type="button">Select</button>
-        </div>
-      </article>
-    </template>
 
     <script type="module" src="./app.js"></script>
   </body>
